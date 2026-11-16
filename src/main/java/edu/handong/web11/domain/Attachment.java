@@ -32,4 +32,7 @@ public class Attachment {
     public String getStoredFilename() { return storedFilename; }
     public String getContentType() { return contentType; }
     public long getFileSize() { return fileSize; }
+    public boolean isImage() {
+        return contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/gif");
+    }
 }
