@@ -34,8 +34,8 @@ public class AttachmentController {
     public ResponseEntity<Resource> view(@PathVariable Long id) {
         Attachment file = attachments.findById(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "첨부파일이 없습니다."));
-        if (!file.isImage())
-            throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "이미지 파일만 미리보기할 수 있습니다.");
+        if (!file.getContentType().startsWith("image/"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일만 미리보기할 수 있습니다.");
         Resource resource = storage.load(file);
         String disposition = ContentDisposition.inline()
             .filename(file.getOriginalFilename(), StandardCharsets.UTF_8)

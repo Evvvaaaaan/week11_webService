@@ -9,8 +9,5 @@ h1 { font-size:2rem; font-weight:750; letter-spacing:-0.04em; }
 body { background:#eef2ff; }
 .subtitle { color:#64748b; margin:.4rem 0 0; }
 .btn-primary { background:#4f46e5; border-color:#4f46e5; }
-.btn-outline-primary { color:#4f46e5; border-color:#4f46e5; }
-.btn-outline-primary:hover { background:#4f46e5; border-color:#4f46e5; }
 .table th { background:#e0e7ff; color:#4338ca; }
-.file-type { background:#e0e7ff; color:#4338ca; }
 .preview-img { max-width:100%; max-height:300px; border-radius:12px; }
