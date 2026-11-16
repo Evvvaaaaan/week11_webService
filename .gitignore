@@ -6,3 +6,4 @@ uploads/
 upload-files/
 .env
 .DS_Store
+out/
