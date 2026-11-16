@@ -35,4 +35,13 @@ public class Attachment {
     public boolean isImage() {
         return contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/gif");
     }
+    public String getExtension() {
+        int dot = storedFilename.lastIndexOf('.');
+        return dot < 0 ? "" : storedFilename.substring(dot + 1).toUpperCase();
+    }
+    public String getReadableSize() {
+        if (fileSize < 1024) return fileSize + " B";
+        if (fileSize < 1024 * 1024) return String.format("%.1f KB", fileSize / 1024.0);
+        return String.format("%.1f MB", fileSize / (1024.0 * 1024));
+    }
 }
