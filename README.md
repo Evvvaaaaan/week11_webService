@@ -27,51 +27,56 @@
 
 # Source Code Exploration
 
-## 1. 게시글과 파일을 함께 올리면 요청은 어떤 순서로 처리되는가
-- form.html의 form은 POST 방식이고 enctype이 multipart/form-data입니다.
-- PostController.create()가 제목과 내용은 PostForm으로, 파일은 List of MultipartFile로 받습니다.
-- PostService.create()가 파일마다 FileStorageService.store()를 호출해 디스크에 저장하고, 만들어진 Attachment를 Post에 붙인 뒤 saveAndFlush로 DB에 저장합니다.
-- 저장이 끝나면 /posts/{id} 상세 화면으로 redirect합니다.
+## Project Structure & Spring MVC
 
-## 2. 파일을 원래 이름이 아니라 UUID 이름으로 저장하는 이유는 무엇인가
-- FileStorageService.store()에서 UUID.randomUUID()와 확장자를 붙여 저장 이름을 만듭니다.
-- 두 사람이 같은 이름의 파일을 올려도 서로 덮어쓰지 않습니다.
-- 사용자가 정한 파일 이름이 서버 경로에 그대로 쓰이지 않아 경로 조작 위험이 줄어듭니다.
-- 원래 이름은 Attachment.originalFilename에 따로 저장해 다운로드할 때 다시 사용합니다.
+### 1. PostController, PostService, PostRepository는 각각 어떤 역할을 하며, 서로 어떻게 연결되는가?
+- PostController는 /posts 같은 URL 요청을 받아 PostService를 호출하고, 결과를 Model에 담아 list.html, form.html, detail.html 화면을 반환합니다.
+- PostService는 all(), get(), create(), update(), delete()에서 @Transactional로 실제 처리를 하고, 파일 저장은 FileStorageService에 맡깁니다.
+- PostRepository는 JpaRepository를 상속해 SQL을 직접 쓰지 않고 posts 테이블을 조회하고 저장합니다.
+- 세 클래스는 생성자 주입으로 연결되어 PostController가 PostService를, PostService가 PostRepository를 사용합니다.
 
-## 3. 업로드 파일은 어떤 기준으로 검사하는가
-- FileStorageService.store()는 빈 파일, 슬래시나 역슬래시나 ..이 들어간 이름, 240자를 넘는 이름을 거부합니다.
-- 확장자가 ALLOWED 목록(jpg, jpeg, png, gif, pdf, txt)에 없으면 거부합니다.
-- 파일 크기가 10MB를 넘으면 거부하고, application.properties에도 파일 10MB, 요청 전체 30MB 제한이 있습니다.
-- 검사에 실패하면 IllegalArgumentException이 발생하고 PostController.create()가 이를 잡아 작성 화면에 오류 메시지를 보여 줍니다.
+### 2. 게시글 작성 시 HTML Form의 입력값과 첨부파일은 Controller에 어떻게 전달되는가?
+- form.html의 form은 method가 post이고 enctype이 multipart/form-data라서 글자 입력값과 파일을 한 요청으로 보냅니다.
+- 제목과 내용은 th:field로 묶여 PostController.create()의 @ModelAttribute PostForm에 담기고, @Valid로 비어 있는지 검사됩니다.
+- name이 files인 file input의 파일들은 @RequestParam(name = "files") List of MultipartFile로 전달됩니다.
 
-## 4. Content-Type은 어떻게 정해지는가
-- FileStorageService.store()가 요청 헤더의 Content-Type을 믿지 않고 확장자로 직접 정합니다.
-- jpg와 jpeg는 image/jpeg, png는 image/png, gif는 image/gif, pdf는 application/pdf, 나머지는 text/plain입니다.
-- 정해진 값은 Attachment.contentType에 저장되고 미리보기 응답의 Content-Type으로 쓰입니다.
+## JPA & Entity Relationship
 
-## 5. DB에는 무엇이 저장되고 실제 파일은 어디에 저장되는가
-- 실제 파일은 app.upload-dir로 지정한 uploads 폴더에 저장됩니다.
-- attachments 테이블에는 id, post_id, original_filename, stored_filename, content_type, file_size가 저장됩니다.
-- stored_filename에는 unique 제약이 있어 같은 저장 이름이 두 번 들어갈 수 없습니다.
-- 관련 파일은 Attachment.java와 application.properties입니다.
+### 3. Post와 Attachment Entity는 어떤 관계이며, @ManyToOne과 @OneToMany는 각각 어떤 역할을 하는가?
+- 게시글 하나에 첨부파일 여러 개가 달리는 1:N 관계입니다.
+- Attachment.post의 @ManyToOne과 @JoinColumn(name = "post_id")는 attachments 테이블에 post_id 외래키를 만들고 관계를 관리하는 쪽입니다.
+- Post.attachments의 @OneToMany(mappedBy = "post")는 외래키를 갖지 않고, 게시글에 달린 첨부파일 목록을 읽기 위한 쪽입니다.
+- Post.addAttachment()가 목록에 추가하면서 Attachment의 post도 설정해 양쪽 관계를 맞춥니다.
 
-## 6. Post와 Attachment는 어떤 관계인가
-- Post 하나에 Attachment 여러 개가 연결되는 1:N 관계입니다.
-- Post.attachments는 @OneToMany(mappedBy = "post", cascade = ALL, orphanRemoval = true)이고, Attachment.post는 @ManyToOne으로 post_id 외래키를 가집니다.
-- Post.addAttachment()가 목록에 추가하면서 Attachment의 post도 함께 설정해 양쪽 관계를 맞춥니다.
-- PostRepository는 @EntityGraph로 게시글을 조회할 때 첨부파일을 함께 가져옵니다.
+### 4. cascade = CascadeType.ALL과 orphanRemoval = true는 어떤 역할을 하며, 실제 디스크에 저장된 파일에도 영향을 주는가?
+- cascade = CascadeType.ALL은 Post를 저장하거나 삭제할 때 연결된 Attachment도 함께 저장하거나 삭제하게 합니다. 그래서 PostService.create()는 saveAndFlush(post) 한 번으로 첨부파일 정보까지 저장합니다.
+- orphanRemoval = true는 Post의 attachments 목록에서 빠진 Attachment를 DB에서도 삭제합니다.
+- 두 설정은 DB의 attachments 행에만 적용되고 uploads 폴더의 실제 파일은 지우지 않습니다. 그래서 PostService.delete()가 FileStorageService.deleteIfExists()로 파일을 먼저 직접 삭제합니다.
 
-## 7. 다운로드는 어떻게 동작하는가
-- 상세 화면의 다운로드 버튼은 GET /attachments/{id}/download로 요청합니다.
-- AttachmentController.download()가 id로 Attachment를 찾고, 없으면 404를 반환합니다.
-- FileStorageService.load()가 저장 이름으로 실제 파일을 찾아 Resource로 돌려줍니다.
-- 응답의 Content-Type은 application/octet-stream이고 Content-Disposition은 attachment와 원래 파일 이름(UTF-8)이라서 브라우저가 파일을 내려받습니다.
+## File Upload
 
-## 8. 저장이나 삭제 중 문제가 생기면 파일은 어떻게 정리되는가
-- PostService.create()는 이미 저장한 파일을 createdFiles에 모아 두고, 중간에 예외가 나면 그 파일들을 deleteIfExists로 지웁니다.
-- FileStorageService.store()는 파일 복사 중 IOException이 나면 만들던 파일을 지우고 500 오류를 던집니다.
-- PostService.delete()는 게시글을 지우기 전에 첨부파일을 디스크에서 먼저 삭제하고, DB의 attachments 행은 cascade와 orphanRemoval로 함께 삭제됩니다.
+### 5. MultipartFile은 무엇이며, 업로드된 파일은 어떤 과정을 거쳐 서버에 저장되는가?
+- MultipartFile은 multipart 요청으로 올라온 파일 하나를 나타내는 Spring 인터페이스로, 원래 이름, 크기, 내용 스트림을 꺼낼 수 있습니다.
+- PostService.create()가 파일마다 FileStorageService.store()를 호출하고, store()는 빈 파일, 이름, 확장자, 10MB 크기를 검사한 뒤 UUID 이름과 저장 경로를 만듭니다.
+- getInputStream()으로 읽은 내용을 Files.copy()로 uploads 폴더에 쓰고, 파일 정보를 담은 Attachment를 돌려줍니다.
+- PostService.create()는 이 Attachment를 Post에 붙여 DB에 저장하고, 중간에 실패하면 이미 저장한 파일을 지웁니다.
+
+### 6. 파일을 원본 이름 대신 UUID 기반 파일명으로 저장하는 이유는 무엇인가?
+- 여러 사용자가 같은 이름의 파일을 올려도 서로 덮어쓰지 않게 하기 위해서입니다.
+- 사용자가 정한 이름을 서버 경로에 그대로 쓰지 않으므로 특수문자나 경로 조작 문제를 피할 수 있습니다.
+- FileStorageService.store()가 UUID.randomUUID()에 확장자를 붙여 저장 이름을 만들고, 원래 이름은 Attachment.originalFilename에 따로 저장해 다운로드할 때 사용합니다.
+
+## File Download & Security
+
+### 7. 파일 다운로드 시 Resource, ResponseEntity, Content-Disposition은 각각 어떤 역할을 하는가?
+- Resource는 디스크의 실제 파일을 가리키는 객체로, FileStorageService.load()가 PathResource로 만들어 돌려줍니다.
+- ResponseEntity는 상태 코드, 헤더, 본문을 포함한 HTTP 응답 전체이고, AttachmentController.download()는 200 상태와 application/octet-stream 형식으로 Resource를 본문에 담아 보냅니다.
+- Content-Disposition 헤더는 attachment로 설정되어 브라우저가 파일을 화면에 열지 않고 원래 파일 이름으로 내려받게 합니다.
+
+### 8. 파일 저장 과정에서 normalize()와 startsWith()를 사용하는 이유는 무엇인가?
+- normalize()는 경로 안의 .과 ..을 정리해 실제로 가리키는 경로를 만듭니다.
+- startsWith(uploadDir)는 정리된 경로가 uploads 폴더 안에 있는지 확인해, ../ 같은 이름으로 다른 폴더의 파일을 쓰거나 읽는 경로 조작 공격을 막습니다.
+- FileStorageService.store()에서 저장할 때와 FileStorageService.load()에서 파일을 읽을 때 모두 이 검사를 합니다.
 
 ## 주석을 작성한 메서드 3개
 - PostController.create(): src/main/java/edu/handong/web11/controller/PostController.java
@@ -117,7 +122,8 @@
 
 - 변경 후: 상세 화면, 바뀐 배경색과 파일 형식 배지
 
-![변경 후 상세 화면](results/02_upload.png)
+![변경 후 상세 화면](results/05_list_after.png)
+
 
 # New Feature
 
@@ -127,6 +133,15 @@
     - AttachmentController.view()
     - detail.html의 img 태그
     - app.css의 preview-img 스타일
+
+## 요구사항 반영
+- 상세 화면 이미지 표시: detail.html이 contentType이 image/로 시작하는 첨부파일(jpg, jpeg, png, gif)만 골라 img 태그로 보여 주고, view()는 Content-Disposition을 inline으로 보내 브라우저가 바로 표시합니다.
+- 이미지가 아닌 파일: PDF, TXT는 미리보기를 만들지 않고 기존 다운로드 버튼(GET /attachments/{id}/download)을 그대로 사용합니다.
+- 오류 처리
+    - 존재하지 않는 첨부파일 ID: 404, 첨부파일이 없습니다.
+    - 숫자가 아닌 잘못된 ID: 400
+    - 이미지가 아닌 파일을 view로 요청: 400, 이미지 파일만 미리보기할 수 있습니다.
+    - DB에는 있지만 실제 파일이 없음: 404, 파일이 없습니다.
 
 # Testing & Deployment
 
@@ -148,7 +163,7 @@
 ![이미지 미리보기](results/04_preview.png)
 
 ## 배포
-- Render Deployment URL: (배포 URL 입력)
+- Render Deployment URL: https://week11-sample-project-uozl.onrender.com
 - Render의 기본 파일 시스템은 재시작이나 재배포 때 초기화될 수 있어서, 배포 환경에서는 이전에 올린 파일이 사라질 수 있습니다.
 
 # Weekly Review
