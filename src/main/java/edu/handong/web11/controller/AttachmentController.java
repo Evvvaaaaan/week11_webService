@@ -43,7 +43,6 @@ public class AttachmentController {
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType(file.getContentType()))
             .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
-            .header("X-Content-Type-Options", "nosniff")
             .body(resource);
     }
 }
