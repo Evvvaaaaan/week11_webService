@@ -39,10 +39,16 @@ public class PostController {
 
     @PostMapping("/posts")
     public String create(@Valid @ModelAttribute("postForm") PostForm form, BindingResult errors,
-                         @RequestParam(name = "files", required = false) List<MultipartFile> files) {
+                         @RequestParam(name = "files", required = false) List<MultipartFile> files,
+                         Model model) {
         if (errors.hasErrors()) return "posts/form";
-        Long id = posts.create(form, files == null ? List.of() : files);
-        return "redirect:/posts/" + id;
+        try {
+            Long id = posts.create(form, files == null ? List.of() : files);
+            return "redirect:/posts/" + id;
+        } catch (IllegalArgumentException e) {
+            model.addAttribute("fileError", e.getMessage());
+            return "posts/form";
+        }
     }
 
     @GetMapping("/posts/{id}")
