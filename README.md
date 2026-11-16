@@ -10,7 +10,7 @@
 
 ## 링크
 - GitHub Repository: https://github.com/2026-2-WebService/assign11-c01-22300404
-- Render Deployment: 
+- Render Deployment: https://week11-sample-project-uozl.onrender.com
 
 # Installation
 
