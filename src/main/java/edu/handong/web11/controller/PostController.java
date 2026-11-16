@@ -37,16 +37,22 @@ public class PostController {
         return "posts/form";
     }
 
+    // 게시글 작성: 제목/내용은 PostForm, 첨부파일은 files로 받아 저장한다.
     @PostMapping("/posts")
     public String create(@Valid @ModelAttribute("postForm") PostForm form, BindingResult errors,
                          @RequestParam(name = "files", required = false) List<MultipartFile> files,
                          Model model) {
+        // 제목이나 내용이 비어 있으면 작성 화면으로 돌아간다.
         if (errors.hasErrors()) return "posts/form";
         try {
+            // 파일을 선택하지 않았으면 빈 목록을 넘긴다.
             Long id = posts.create(form, files == null ? List.of() : files);
+            // 저장이 끝나면 새 게시글의 상세 화면으로 이동한다.
             return "redirect:/posts/" + id;
         } catch (IllegalArgumentException e) {
+            // 파일 검사에 실패하면 오류 메시지를 작성 화면에 보여 준다.
             model.addAttribute("fileError", e.getMessage());
+            // 입력한 제목과 내용을 유지한 채 작성 화면을 다시 보여 준다.
             return "posts/form";
         }
     }
